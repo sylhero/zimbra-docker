@@ -7,6 +7,7 @@ CONTAINERIP=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut 
 RANDOMHAM=$(date +%s|sha256sum|base64|head -c 10)
 RANDOMSPAM=$(date +%s|sha256sum|base64|head -c 10)
 RANDOMVIRUS=$(date +%s|sha256sum|base64|head -c 10)
+INSTALLED=/opt/zimbra/.INSTALLED
 
 ## Installing the DNS Server ##
 echo "Configuring DNS Server"
@@ -20,6 +21,13 @@ address=/$HOSTNAME.$DOMAIN/$CONTAINERIP
 user=root
 EOF
 sudo service dnsmasq restart
+
+## Already installed?
+if [ -f $INSTALLED ]; then
+  su -c "/opt/zimbra/bin/zmcontrol start" zimbra
+   while true; do sleep 1000; done
+   exit
+fi
 
 ##Creating the Zimbra Collaboration Config File ##
 touch /opt/zimbra-install/installZimbraScript
@@ -126,12 +134,16 @@ zimbra_require_interprocess_security="1"
 zimbra_server_hostname="$HOSTNAME.$DOMAIN"
 INSTALL_PACKAGES="zimbra-core zimbra-ldap zimbra-logger zimbra-mta zimbra-snmp zimbra-store zimbra-apache zimbra-spell zimbra-memcached zimbra-proxy"
 EOF
+
 ##Install the Zimbra Collaboration ##
 echo "Downloading Zimbra Collaboration 8.8.7"
 wget -O /opt/zimbra-install/zimbra-zcs-8.8.7.tar.gz https://files.zimbra.com/downloads/8.8.7_GA/zcs-8.8.7_GA_1964.UBUNTU16_64.20180223145016.tgz
 
 echo "Extracting files from the archive"
 tar xzvf /opt/zimbra-install/zimbra-zcs-8.8.7.tar.gz -C /opt/zimbra-install/
+
+echo "Update package cache"
+apt-get update && apt-get upgrade -y
 
 echo "Installing Zimbra Collaboration just the Software"
 cd /opt/zimbra-install/zcs-* && ./install.sh -s < /opt/zimbra-install/installZimbra-keystrokes
@@ -141,6 +153,10 @@ echo "Installing Zimbra Collaboration injecting the configuration"
 
 su - zimbra -c 'zmcontrol restart'
 echo "You can access now to your Zimbra Collaboration Server"
+
+##Mark installed ##
+touch $INSTALLED
+
 
 if [[ $1 == "-d" ]]; then
   while true; do sleep 1000; done
